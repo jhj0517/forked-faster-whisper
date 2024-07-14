@@ -2,7 +2,7 @@ import bisect
 import functools
 import os
 
-from typing import List, NamedTuple, Optional
+from typing import List, NamedTuple, Optional, Tuple
 
 import numpy as np
 
