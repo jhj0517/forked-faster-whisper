@@ -331,13 +331,23 @@ class WhisperModel:
             elif isinstance(vad_parameters, dict):
                 vad_parameters = VadOptions(**vad_parameters)
             speech_chunks = get_speech_timestamps(audio, vad_parameters)
-            audio = collect_chunks(audio, speech_chunks)
+            audio, non_speech_duration = collect_chunks(
+                audio=audio,
+                chunks=speech_chunks,
+                silence_non_speech=vad_parameters.silence_non_speech
+            )
             duration_after_vad = audio.shape[0] / sampling_rate
 
-            self.logger.info(
-                "VAD filter removed %s of audio",
-                format_timestamp(duration - duration_after_vad),
-            )
+            if vad_parameters.silence_non_speech:
+                self.logger.info(
+                    "VAD filter silenced %s of audio",
+                    format_timestamp(non_speech_duration),
+                )
+            else:
+                self.logger.info(
+                    "VAD filter removed %s of audio",
+                    format_timestamp(duration - duration_after_vad),
+                )
 
             if self.logger.isEnabledFor(logging.DEBUG):
                 self.logger.debug(
