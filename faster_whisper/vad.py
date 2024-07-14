@@ -25,6 +25,7 @@ class VadOptions(NamedTuple):
       min_silence_duration_ms: In the end of each speech chunk wait for min_silence_duration_ms
         before separating it
       speech_pad_ms: Final speech chunks are padded by speech_pad_ms each side
+      silence_non_speech: If True, non-speech parts will be silenced instead of being removed.
     """
 
     threshold: float = 0.5
@@ -32,6 +33,7 @@ class VadOptions(NamedTuple):
     max_speech_duration_s: float = float("inf")
     min_silence_duration_ms: int = 2000
     speech_pad_ms: int = 400
+    silence_non_speech: bool = False
 
 
 def get_speech_timestamps(
@@ -176,12 +178,42 @@ def get_speech_timestamps(
     return speeches
 
 
-def collect_chunks(audio: np.ndarray, chunks: List[dict]) -> np.ndarray:
-    """Collects and concatenates audio chunks."""
-    if not chunks:
-        return np.array([], dtype=np.float32)
+def collect_chunks(
+    audio: np.ndarray,
+    chunks: List[dict],
+    silence_non_speech: bool = False
+) -> Tuple[np.ndarray, float]:
+    """Collects and concatenate audio chunks.
 
-    return np.concatenate([audio[chunk["start"] : chunk["end"]] for chunk in chunks])
+    Args:
+      audio: One dimensional float array.
+      chunks: List of dictionaries containing start and end samples of speech chunks
+      silence_non_speech: If True, non-speech parts will be silenced instead of being removed.
+
+    Returns:
+      Tuple containing:
+        - Processed audio as a numpy array
+        - Duration of non-speech (silenced or removed) audio in seconds
+    """
+    if not chunks:
+        return np.array([], dtype=np.float32), 0.0
+
+    sampling_rate = 16000
+    total_samples = audio.shape[0]
+    speech_samples_count = sum(chunk["end"] - chunk["start"] for chunk in chunks)
+    non_speech_samples_count = total_samples - speech_samples_count
+    non_speech_duration = non_speech_samples_count / sampling_rate
+
+    if silence_non_speech:
+        processed_audio = np.zeros_like(audio)
+        for chunk in chunks:
+            start, end = chunk['start'], chunk['end']
+            processed_audio[start:end] = audio[start:end]
+
+    else:
+        processed_audio = np.concatenate([audio[chunk["start"]: chunk["end"]] for chunk in chunks])
+
+    return processed_audio, non_speech_duration
 
 
 class SpeechTimestampsMap:
